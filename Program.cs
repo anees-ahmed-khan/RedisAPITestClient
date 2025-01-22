@@ -52,7 +52,7 @@ class Program
 
         var requestBody = new
         {
-            keywords = keywords.Count > 500 ? keywords.GetRange(0, 499) : keywords,
+            keywords = keywords.Count > 500 ? keywords.GetRange(0, 100) : keywords,
             localOnly,
             assetClassesToInclude
         };
@@ -178,16 +178,27 @@ class Program
     private static async Task<string> MakePostRequest(string apiUrl, string bearerToken, object payload, HttpClient httpClient)
     {
         string jsonPayload = JsonConvert.SerializeObject(payload);
-        StringContent content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
-        HttpResponseMessage response = await httpClient.PostAsync(apiUrl, content);
-
-        if (response.IsSuccessStatusCode)
+        StringContent content = new(jsonPayload, Encoding.UTF8, "application/json");
+        httpClient.Timeout = TimeSpan.FromMinutes(5);
+        try
         {
-            return await response.Content.ReadAsStringAsync();
+            HttpResponseMessage response = await httpClient.PostAsync(apiUrl, content);
+            if (response.IsSuccessStatusCode)
+            {
+                return await response.Content.ReadAsStringAsync();
+            }
+            else
+            {
+                return $"Error: {response.StatusCode} - {response.ReasonPhrase}";
+            }
         }
-        else
+        catch (TaskCanceledException ex) when (!ex.CancellationToken.IsCancellationRequested)
         {
-            return $"Error: {response.StatusCode} - {response.ReasonPhrase}";
+            return "Error: Request timed out.";
+        }
+        catch (Exception ex)
+        {
+            return $"Error: {ex.Message}";
         }
     }
 
